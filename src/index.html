@@ -1,32 +1,341 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="styles.css" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus App</title>
-        <script type="module" src="/main.js" defer></script>
-    </head>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考勤数据清洗工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        neutral: '#6B7280',
+                        accent: '#F59E0B',
+                        danger: '#EF4444',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .shadow-card {
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+            .transition-all-300 {
+                transition: all 300ms ease-in-out;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- 头部 -->
+        <header class="text-center mb-8">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-800 mb-2">
+                <i class="fa fa-calendar-check-o text-primary mr-2"></i>考勤数据清洗工具
+            </h1>
+        </header>
 
-    <body>
-        <main class="container">
-            <h1>Welcome to PakePlus</h1>
-            <form class="row" id="greet-form">
-                <input id="inputValue" placeholder="Enter a something..." />
-            </form>
-            <div class="resultBox">
-                <span>result: </span>
-                <span id="result"></span>
+        <!-- 主内容区 -->
+        <main class="bg-white rounded-xl shadow-card p-6 mb-8">
+            <!-- 文件上传区域 -->
+            <div class="mb-8">
+                <label for="file-upload" class="block text-sm font-medium text-gray-700 mb-2">
+                    选择考勤 Excel 文件
+                </label>
+                <div class="relative">
+                    <div class="flex items-center justify-center w-full">
+                        <label for="file-upload" class="flex flex-col items-center justify-center w-full h-40 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all-300">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <i class="fa fa-cloud-upload text-4xl text-gray-400 mb-2"></i>
+                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">点击上传</span> 或拖放文件</p>
+                                <p class="text-xs text-gray-500">支持 XLSX, XLS 格式</p>
+                            </div>
+                            <input id="file-upload" type="file" class="hidden" accept=".xlsx,.xls" />
+                        </label>
+                    </div>
+                    <div id="file-name" class="mt-2 text-sm text-gray-600 hidden">
+                        <i class="fa fa-file-excel-o text-primary mr-1"></i>
+                        <span id="selected-file-name"></span>
+                    </div>
+                </div>
             </div>
-            <div class="invokeBox">
-                <button id="openUrl">open_url_browser</button>
-                <button id="openUrlNew">open_url_new</button>
-                <button id="runCommand">run_command</button>
-                <button id="downloadFile">download_file</button>
-                <button id="getExeDir">get_exe_dir</button>
-                <button id="getEnvVar">get_env_var</button>
-                <button id="findPort">find_port</button>
+
+            <!-- 处理按钮 -->
+            <div class="flex justify-center mb-8">
+                <button id="process-btn" class="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-md transition-all-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                    <i class="fa fa-cogs mr-2"></i>
+                    <span>开始处理</span>
+                </button>
+            </div>
+
+            <!-- 进度条 -->
+            <div id="progress-container" class="mb-6 hidden">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm text-gray-600">处理进度</span>
+                    <span id="progress-text" class="text-sm font-medium text-primary">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-primary h-2.5 rounded-full transition-all-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- 结果区域 -->
+            <div id="result-container" class="mb-6 hidden">
+                <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <i class="fa fa-check-circle text-green-500 text-xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-green-800">处理完成</h3>
+                            <div class="mt-2 text-sm text-green-700">
+                                <p id="result-message"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 下载按钮 -->
+            <div id="download-container" class="text-center hidden">
+                <a id="download-link" href="#" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-secondary hover:bg-secondary/90 transition-all-300">
+                    <i class="fa fa-download mr-2"></i>
+                    下载清洗后的文件
+                </a>
             </div>
         </main>
-    </body>
+
+        <!-- 页脚 -->
+        <footer class="text-center text-gray-500 text-sm">
+            <p>© 2025 考勤数据处理工具 | 版本 1.0丨企友</p>
+        </footer>
+    </div>
+
+    <script>
+        // 全局变量
+        let inputFile = null;
+        let processedData = null;
+
+        // DOM 元素
+        const fileUpload = document.getElementById('file-upload');
+        const fileName = document.getElementById('file-name');
+        const selectedFileName = document.getElementById('selected-file-name');
+        const processBtn = document.getElementById('process-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const resultContainer = document.getElementById('result-container');
+        const resultMessage = document.getElementById('result-message');
+        const downloadContainer = document.getElementById('download-container');
+        const downloadLink = document.getElementById('download-link');
+
+        // 自动加载 XLSX 库
+        function ensureXLSXLoaded(callback) {
+            if (window.XLSX) {
+                callback();
+            } else {
+                if (window._XLSXLoading) {
+                    window._XLSXLoading.push(callback);
+                    return;
+                }
+                window._XLSXLoading = [callback];
+                var script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+                script.onload = function() {
+                    window._XLSXLoading.forEach(cb => cb());
+                    window._XLSXLoading = null;
+                };
+                document.head.appendChild(script);
+            }
+        }
+
+        // 文件选择事件
+        fileUpload.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                inputFile = this.files[0];
+                selectedFileName.textContent = inputFile.name;
+                fileName.classList.remove('hidden');
+                processBtn.disabled = false;
+            }
+        });
+
+        // 拖放功能
+        document.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        document.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    inputFile = file;
+                    fileUpload.files = e.dataTransfer.files;
+                    selectedFileName.textContent = inputFile.name;
+                    fileName.classList.remove('hidden');
+                    processBtn.disabled = false;
+                } else {
+                    alert('请上传 Excel 文件 (.xlsx 或 .xls)');
+                }
+            }
+        });
+
+        // 处理按钮点击事件
+        processBtn.addEventListener('click', function() {
+            if (!inputFile) {
+                alert('请先选择一个 Excel 文件');
+                return;
+            }
+            ensureXLSXLoaded(function() {
+                // 显示进度条
+                progressContainer.classList.remove('hidden');
+                updateProgress(0, '开始处理...');
+                // 禁用处理按钮
+                processBtn.disabled = true;
+                // 读取文件
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        updateProgress(10, '正在读取文件...');
+                        // 解析 Excel 文件
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        // 获取第一个工作表
+                        updateProgress(20, '正在解析数据...');
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        // 转换为 JSON
+                        updateProgress(30, '正在转换数据格式...');
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        if (jsonData.length < 4) {
+                            throw new Error('Excel 文件格式不正确，数据行数不足');
+                        }
+                        // 处理数据
+                        updateProgress(40, '正在处理打卡时间...');
+                        const processedData = processAttendanceData(jsonData);
+                        // 创建新的工作表
+                        updateProgress(80, '正在生成结果文件...');
+                        const newWorksheet = XLSX.utils.json_to_sheet(processedData);
+                        const newWorkbook = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, '清洗后数据');
+                        // 生成文件并下载
+                        updateProgress(90, '准备下载...');
+                        const excelBuffer = XLSX.write(newWorkbook, { bookType: 'xlsx', type: 'array' });
+                        const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+                        // 生成下载链接
+                        const url = URL.createObjectURL(blob);
+                        const fileName = inputFile.name.replace(/\.(xlsx|xls)$/, '_清洗后.xlsx');
+                        downloadLink.href = url;
+                        downloadLink.download = fileName;
+                        // 显示结果
+                        updateProgress(100, '处理完成');
+                        resultMessage.textContent = `成功处理 ${jsonData.length - 3} 条记录，生成 ${processedData.length} 条有效打卡记录。`;
+                        resultContainer.classList.remove('hidden');
+                        downloadContainer.classList.remove('hidden');
+                    } catch (error) {
+                        console.error('处理出错:', error);
+                        alert(`处理出错: ${error.message}`);
+                        updateProgress(0, '处理失败');
+                        processBtn.disabled = false;
+                    }
+                };
+                reader.onerror = function() {
+                    alert('读取文件时出错');
+                    updateProgress(0, '处理失败');
+                    processBtn.disabled = false;
+                };
+                reader.readAsArrayBuffer(inputFile);
+            });
+        });
+
+        // 更新进度条
+        function updateProgress(percent, text) {
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `${percent}%`;
+            if (text) {
+                progressText.title = text;
+            }
+        }
+
+        // 处理考勤数据
+        function processAttendanceData(data) {
+            // 提取表头
+            const headers = ['姓名', '打卡时间'];
+            
+            // 从第4行(index=3)开始加载数据
+            const records = data.slice(3);
+            
+            // 处理结果
+            const result = [];
+            
+            // 遍历每一行记录
+            records.forEach((row, index) => {
+                // 更新进度
+                if (index % 10 === 0) {
+                    const progress = Math.floor(40 + (index / records.length) * 40);
+                    updateProgress(progress, `正在处理数据 ${index}/${records.length}`);
+                }
+                
+                // 假设姓名在第2列(index=1)
+                const name = row[1] || '';
+                
+                // 假设打卡时间记录在倒数第2列(index=-2)
+                const timeIndex = row.length - 2;
+                const timeRecord = row[timeIndex] || '';
+                
+                if (name && timeRecord) {
+                    // 按空格分割打卡时间
+                    const times = timeRecord.split(' ');
+                    
+                    // 处理每个打卡时间
+                    times.forEach(time => {
+                        if (time && time !== '--') {
+                            // 去除括号及括号内的文字
+                            const cleanTime = time.replace(/\(.*\)/, '').trim();
+                            
+                            if (cleanTime) {
+                                // 添加到结果
+                                result.push({
+                                    '姓名': name,
+                                    '打卡时间': cleanTime
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // 根据姓名和打卡时间去重
+            const uniqueResult = [];
+            const seen = new Set();
+            
+            result.forEach(item => {
+                const key = `${item.姓名}-${item.打卡时间}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueResult.push(item);
+                }
+            });
+            
+            return uniqueResult;
+        }
+    </script>
+</body>
 </html>
+    
