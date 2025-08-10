@@ -1,32 +1,721 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="styles.css" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus App</title>
-        <script type="module" src="/main.js" defer></script>
-    </head>
+<html lang="zh-CN"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工程预算数据格式清洗工具-表07</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* 水印样式 */
+        .watermark-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* 确保水印不影响下方元素的交互 */
+            z-index: 10; /* 确保水印在内容上方但不遮挡模态框等 */
+            overflow: hidden;
+        }
+        
+        .watermark {
+            position: absolute;
+            color: rgba(0, 0, 0, 0.05);
+            font-size: 14px;
+            font-weight: bold;
+            transform: rotate(30deg); /* 向右上倾斜30度 */
+            transform-origin: center;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- 水印容器 -->
+    <div class="watermark-container" id="watermarkContainer"></div>
 
-    <body>
-        <main class="container">
-            <h1>Welcome to PakePlus</h1>
-            <form class="row" id="greet-form">
-                <input id="inputValue" placeholder="Enter a something..." />
-            </form>
-            <div class="resultBox">
-                <span>result: </span>
-                <span id="result"></span>
+    <div class="container mx-auto px-4 py-8 relative z-20"> <!-- 添加相对定位和z-index确保内容在水印上方 -->
+        <!-- 页面标题 -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-table mr-3 text-blue-600"></i>
+                工程预算数据格式清洗工具-表07
+            </h1>
+        </div>
+
+        <!-- 操作区域 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- 数据导入 -->
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-4 text-white flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">
+                            <i class="fas fa-file-upload mr-2"></i>数据导入
+                        </h3>
+                        <div class="bg-white bg-opacity-20 rounded-full w-8 h-8 flex items-center justify-center">
+                            <i class="fas fa-arrow-up text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="relative mt-auto">
+                        <input type="file" id="fileUpload" accept=".xls, .xlsx, .xlsm, .xlsb" class="hidden">
+                        <label for="fileUpload" class="bg-white text-blue-600 font-medium py-2 px-3 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors w-full inline-block text-center text-sm">
+                            <i class="fas fa-file-excel mr-2"></i>选择Excel文件
+                        </label>
+                        <p class="text-white text-xs mt-1 text-center opacity-80">
+                            支持格式: XLS, XLSX, XLSM, XLSB
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 数据导出 -->
+                <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-4 text-white flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">
+                            <i class="fas fa-file-download mr-2"></i>数据导出
+                        </h3>
+                        <div class="bg-white bg-opacity-20 rounded-full w-8 h-8 flex items-center justify-center">
+                            <i class="fas fa-arrow-down text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-auto">
+                        <button id="exportExcel" class="bg-white text-green-600 font-medium py-2 px-3 rounded-lg cursor-pointer hover:bg-green-50 transition-colors w-full text-sm">
+                            <i class="fas fa-file-excel mr-2"></i>导出Excel文件
+                        </button>
+                        <p class="text-white text-xs mt-1 text-center opacity-80">
+                            导出格式: XLSX
+                        </p>
+                    </div>
+                </div>
             </div>
-            <div class="invokeBox">
-                <button id="openUrl">open_url_browser</button>
-                <button id="openUrlNew">open_url_new</button>
-                <button id="runCommand">run_command</button>
-                <button id="downloadFile">download_file</button>
-                <button id="getExeDir">get_exe_dir</button>
-                <button id="getEnvVar">get_env_var</button>
-                <button id="findPort">find_port</button>
+            
+            <!-- 提示文本 -->
+            <div class="mt-4 text-sm text-gray-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                <i class="fas fa-info-circle text-amber-500 mr-2"></i>
+                导入失败请检查文件内容是否正确，如内容正确的依旧提示解析失败，请重新用WPS或Office打开后另存为*.xlsx格式的文件后再次尝试
             </div>
-        </main>
-    </body>
-</html>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">总记录数</p>
+                        <p class="text-3xl font-bold text-gray-800" id="totalRecords">0</p>
+                    </div>
+                    <div class="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center">
+                        <i class="fas fa-list-ol text-blue-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">分项工程数量</p>
+                        <p class="text-3xl font-bold text-gray-800" id="groupCount">0</p>
+                    </div>
+                    <div class="bg-purple-100 rounded-full w-12 h-12 flex items-center justify-center">
+                        <i class="fas fa-layer-group text-purple-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">单项工程数</p>
+                        <p class="text-3xl font-bold text-gray-800" id="projectCount">0</p>
+                    </div>
+                    <div class="bg-green-100 rounded-full w-12 h-12 flex items-center justify-center">
+                        <i class="fas fa-building text-green-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden mb-8">
+            <div class="bg-gray-50 px-6 py-4 border-b">
+                <h3 class="text-xl font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-table mr-2 text-blue-600"></i>
+                    合并数据表格
+                </h3>
+                <p class="text-gray-600 mt-1">显示合并后的详细数据记录</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">单项工程</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分项工程</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">序号</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">项目编码</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">项目名称</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">计量单位</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">工程量</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">综合单价</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合价</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- 数据将通过JavaScript动态填充 -->
+                        <tr>
+                            <td colspan="10" class="px-4 py-8 text-center text-gray-500">
+                                <i class="fas fa-file-import text-2xl mb-2"></i>
+                                <p>请导入Excel文件获取数据</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
+                <div class="text-gray-600">
+                    显示 <span id="displayedCount">0</span> 条，共 <span id="totalCount">0</span> 条记录
+                </div>
+                <div class="flex space-x-2">
+                    <button id="prevPage" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed" disabled="">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <span id="pageInfo" class="px-3 py-1 text-gray-600">第 0 页</span>
+                    <button id="nextPage" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed" disabled="">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部版权信息 -->
+        <div class="text-center text-gray-500 text-sm py-6">
+            © 2025 台州企友企业管理咨询有限公司 版权所有
+        </div>
+
+        <!-- 详情模态框 -->
+        <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <div class="bg-gray-800 text-white px-6 py-4 rounded-t-2xl flex justify-between items-center">
+                    <h3 class="text-xl font-bold" id="modalTitle">项目详情</h3>
+                    <button id="closeModal" class="text-white hover:text-gray-300">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="p-6" id="modalContent">
+                    <!-- 详情内容将通过JavaScript动态填充 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 加载指示器 -->
+        <div id="loadingIndicator" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50 hidden">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mb-4"></div>
+                <p class="text-lg text-gray-700" id="loadingText">处理中，请稍候...</p>
+            </div>
+        </div>
+
+        <!-- 消息提示 -->
+        <div id="toast" class="fixed bottom-6 right-6 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center">
+            <i id="toastIcon" class="fas fa-info-circle mr-2"></i>
+            <span id="toastMessage">操作成功</span>
+        </div>
+    </div>
+
+    <script>
+        // 创建水印
+        function createWatermarks() {
+            const container = document.getElementById('watermarkContainer');
+            container.innerHTML = ''; // 清空现有水印
+            
+            const watermarkText = '企友咨询';
+            const density = 20; // 水印密度，数值越小密度越大
+            const winWidth = window.innerWidth;
+            const winHeight = window.innerHeight;
+            
+            // 计算需要多少行和列的水印
+            const cols = Math.ceil(winWidth / 120);
+            const rows = Math.ceil(winHeight / 120);
+            
+            // 创建水印元素
+            for (let i = 0; i < cols; i++) {
+                for (let j = 0; j < rows; j++) {
+                    const watermark = document.createElement('div');
+                    watermark.className = 'watermark';
+                    watermark.textContent = watermarkText;
+                    
+                    // 计算位置，添加随机偏移使分布更自然
+                    const x = i * 120 + (Math.random() * density - density/2);
+                    const y = j * 120 + (Math.random() * density - density/2);
+                    
+                    watermark.style.left = `${x}px`;
+                    watermark.style.top = `${y}px`;
+                    
+                    container.appendChild(watermark);
+                }
+            }
+        }
+
+        // 全局变量
+        let currentData = [];
+        let currentPage = 1;
+        const pageSize = 10;
+        let filteredData = [...currentData];
+
+        // DOM元素
+        const fileUpload = document.getElementById('fileUpload');
+        const exportExcel = document.getElementById('exportExcel');
+        const dataTableBody = document.getElementById('dataTableBody');
+        const prevPage = document.getElementById('prevPage');
+        const nextPage = document.getElementById('nextPage');
+        const pageInfo = document.getElementById('pageInfo');
+        const displayedCount = document.getElementById('displayedCount');
+        const totalCount = document.getElementById('totalCount');
+        const totalRecords = document.getElementById('totalRecords');
+        const groupCount = document.getElementById('groupCount');
+        const projectCount = document.getElementById('projectCount');
+        const detailModal = document.getElementById('detailModal');
+        const closeModal = document.getElementById('closeModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalContent = document.getElementById('modalContent');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const loadingText = document.getElementById('loadingText');
+        const toast = document.getElementById('toast');
+        const toastIcon = document.getElementById('toastIcon');
+        const toastMessage = document.getElementById('toastMessage');
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            createWatermarks(); // 创建水印
+            // 窗口大小改变时重新创建水印
+            window.addEventListener('resize', createWatermarks);
+            
+            updateStats();
+            setupEventListeners();
+        });
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 文件上传
+            fileUpload.addEventListener('change', handleFileUpload);
+            
+            // 导出按钮
+            exportExcel.addEventListener('click', () => exportData('xlsx'));
+            
+            // 分页
+            prevPage.addEventListener('click', () => changePage(-1));
+            nextPage.addEventListener('click', () => changePage(1));
+            
+            // 模态框关闭
+            closeModal.addEventListener('click', () => {
+                detailModal.classList.add('hidden');
+            });
+            
+            // 点击模态框外部关闭
+            detailModal.addEventListener('click', (e) => {
+                if (e.target === detailModal) {
+                    detailModal.classList.add('hidden');
+                }
+            });
+        }
+
+        // 提取单项工程名称
+        function extractProjectName(text) {
+            if (!text) return "未知工程";
+            
+            // 从"单位工程(专业):单项工程-绿化工程 第1页 共2页"中提取"绿化工程"
+            // 先按"-"分割，取后半部分
+            const partAfterHyphen = text.split('-')[1];
+            if (!partAfterHyphen) return "未知工程";
+            
+            // 再按空格分割，取第一部分
+            const projectName = partAfterHyphen.split(' ')[0];
+            
+            return projectName || "未知工程";
+        }
+
+        // 清理分项工程标题，去除序号部分
+        function cleanGroupTitle(title) {
+            if (!title) return title;
+            
+            // 处理数字序号，如: "1、", "2.", "3-", "4) ", "5："
+            let cleaned = title.replace(/^\d+[、.\-)：:]\s*/, '');
+            
+            // 处理中文大写序号，如: "一、", "二. ", "三-", "四) ", "五："
+            // 包含一到十、十一到二十、三十、四十等常见中文数字
+            const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', 
+                                   '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                                   '三十', '四十', '五十', '六十', '七十', '八十', '九十'];
+            
+            chineseNumbers.forEach(num => {
+                // 匹配中文数字加符号的模式
+                const regex = new RegExp(`^${num}[、.\\-):：:]\\s*`);
+                cleaned = cleaned.replace(regex, '');
+            });
+            
+            // 去除首尾空格
+            cleaned = cleaned.trim();
+            
+            // 如果清理后为空，返回原始标题
+            return cleaned || title;
+        }
+
+        // 处理文件上传
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 验证文件类型
+            const validExtensions = ['.xls', '.xlsx', '.xlsm', '.xlsb'];
+            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!validExtensions.includes(fileExtension)) {
+                showToast(`不支持的文件格式。请上传以下格式: ${validExtensions.join(', ')}`, 'error');
+                return;
+            }
+
+            showLoading('正在解析Excel文件...');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // 找到所有包含"表-07"的工作表
+                    const targetSheets = workbook.SheetNames.filter(name => name.includes('表-07'));
+                    
+                    if (targetSheets.length === 0) {
+                        showToast('未找到包含"表-07"的工作表', 'error');
+                        hideLoading();
+                        return;
+                    }
+
+                    showLoading(`正在处理 ${targetSheets.length} 个工作表...`);
+                    
+                    // 处理每个工作表
+                    let allData = [];
+                    
+                    targetSheets.forEach((sheetName) => {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        // 从第2行提取单项工程信息（索引为1，因为数组从0开始）
+                        let projectName = "未知工程";
+                        if (sheetData.length >= 2 && sheetData[1]) {
+                            // 第2行的内容通常在第0列
+                            const row2Content = sheetData[1][0] || '';
+                            projectName = extractProjectName(row2Content.toString());
+                        }
+                        
+                        // 处理当前工作表的数据行
+                        let currentGroup = '';
+                        sheetData.forEach((row) => {
+                            // 检查是否是分项工程标题行
+                            if (!(row[0] && !isNaN(parseFloat(row[0])) && parseFloat(row[0]) > 0) && 
+                                row[2] && 
+                                row[2].trim() !== "项目名称") {
+                                // 清理分项工程标题，去除序号部分
+                                currentGroup = cleanGroupTitle(row[2].trim());
+                                return;
+                            }
+                            
+                            // 检查是否是数据行（第1列是数字序号）
+                            if (row[0] && !isNaN(parseFloat(row[0])) && parseFloat(row[0]) > 0) {
+                                // 如果没有找到分项工程标题，使用工作表名称作为分组
+                                const groupTitle = currentGroup || `工作表: ${sheetName}`;
+                                
+                                const dataRow = {
+                                    '单项工程': projectName,
+                                    '分项工程': groupTitle,
+                                    '序号': parseFloat(row[0]),
+                                    '项目编码': row[1] || '',
+                                    '项目名称': row[2] || '',
+                                    '项目特征': row[3] || '',
+                                    '计量单位': row[4] || '',
+                                    '工程量': row[5] ? parseFloat(row[5]) : 0,
+                                    '综合单价': row[6] ? parseFloat(row[6]) : 0,
+                                    '合价': row[7] ? parseFloat(row[7]) : 0,
+                                    '定额人工费': row[8] ? parseFloat(row[8]) : 0,
+                                    '人工费价差': row[9] ? parseFloat(row[9]) : 0,
+                                    '定额机械费': row[10] ? parseFloat(row[10]) : 0,
+                                    '机械费价差': row[11] ? parseFloat(row[11]) : 0,
+                                    '备注': row[12] || ''
+                                };
+                                
+                                allData.push(dataRow);
+                            }
+                        });
+                    });
+
+                    if (allData.length === 0) {
+                        showToast('未找到有效数据行', 'warning');
+                        hideLoading();
+                        return;
+                    }
+
+                    // 更新全局数据
+                    currentData = [...allData];
+                    filteredData = [...currentData];
+                    currentPage = 1;
+                    
+                    // 更新界面
+                    updateStats();
+                    renderTable();
+                    
+                    showToast(`成功导入 ${allData.length} 条数据`, 'success');
+                } catch (error) {
+                    console.error('Excel解析错误:', error);
+                    showToast('Excel文件解析失败，请检查文件是否损坏或格式正确', 'error');
+                } finally {
+                    hideLoading();
+                }
+            };
+            
+            reader.onerror = function() {
+                showToast('文件读取失败，请尝试重新上传', 'error');
+                hideLoading();
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 导出数据
+        function exportData(format) {
+            if (currentData.length === 0) {
+                showToast('没有数据可导出', 'warning');
+                return;
+            }
+
+            showLoading('正在准备导出文件...');
+
+            try {
+                const ws = XLSX.utils.json_to_sheet(currentData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "表-07合并数据");
+
+                const fileName = `表-07合并数据_${new Date().toISOString().slice(0,10)}.${format}`;
+                
+                if (format === 'xlsx') {
+                    XLSX.writeFile(wb, fileName);
+                }
+
+                showToast(`数据已成功导出为${format.toUpperCase()}格式`, 'success');
+            } catch (error) {
+                console.error('导出错误:', error);
+                showToast('数据导出失败', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, filteredData.length);
+            const paginatedData = filteredData.slice(startIndex, endIndex);
+
+            dataTableBody.innerHTML = '';
+
+            if (paginatedData.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="10" class="px-4 py-8 text-center text-gray-500">
+                        <i class="fas fa-file-import text-2xl mb-2"></i>
+                        <p>请导入Excel文件获取数据</p>
+                    </td>
+                `;
+                dataTableBody.appendChild(row);
+            } else {
+                paginatedData.forEach((item, index) => {
+                    const row = document.createElement('tr');
+                    row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                    row.addEventListener('click', () => showDetail(item));
+                    
+                    row.innerHTML = `
+                        <td class="px-4 py-3 text-sm text-gray-900">${item['单项工程']}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title="${item['分项工程']}">
+                            ${item['分项工程']}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900">${item['序号']}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-mono">${item['项目编码']}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title="${item['项目名称']}">
+                            ${item['项目名称']}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900">${item['计量单位']}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 text-right">${item['工程量'].toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 text-right">¥${item['综合单价'].toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm font-semibold text-gray-900 text-right">¥${item['合价'].toLocaleString()}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <button class="text-blue-600 hover:text-blue-800 focus:outline-none">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    `;
+                    
+                    dataTableBody.appendChild(row);
+                });
+            }
+
+            // 更新分页信息
+            const totalPages = Math.ceil(filteredData.length / pageSize);
+            pageInfo.textContent = `第 ${currentPage} 页 / 共 ${totalPages} 页`;
+            displayedCount.textContent = paginatedData.length;
+            totalCount.textContent = filteredData.length;
+            
+            // 禁用/启用分页按钮
+            prevPage.disabled = currentPage === 1;
+            nextPage.disabled = currentPage === totalPages;
+        }
+
+        // 切换页码
+        function changePage(direction) {
+            const totalPages = Math.ceil(filteredData.length / pageSize);
+            currentPage = Math.max(1, Math.min(currentPage + direction, totalPages));
+            renderTable();
+        }
+
+        // 显示详情
+        function showDetail(item) {
+            modalTitle.textContent = `${item['单项工程']} - ${item['项目名称']}`;
+            
+            // 格式化项目特征（处理换行）
+            const formattedFeatures = item['项目特征'] 
+                ? item['项目特征'].replace(/\n/g, '<br>') 
+                : '无';
+            
+            modalContent.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">基本信息</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-sm text-gray-500">单项工程</p>
+                                <p class="font-medium">${item['单项工程']}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">分项工程</p>
+                                <p class="font-medium">${item['分项工程']}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">序号</p>
+                                <p class="font-medium">${item['序号']}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">项目编码</p>
+                                <p class="font-mono font-medium">${item['项目编码']}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">项目名称</p>
+                                <p class="font-medium">${item['项目名称']}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">计量单位</p>
+                                <p class="font-medium">${item['计量单位']}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">数值信息</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-sm text-gray-500">工程量</p>
+                                <p class="font-medium">${item['工程量'].toLocaleString()} ${item['计量单位']}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">综合单价</p>
+                                <p class="font-medium text-green-600">¥${item['综合单价'].toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">合价</p>
+                                <p class="font-medium text-green-600">¥${item['合价'].toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">定额人工费</p>
+                                <p class="font-medium">¥${item['定额人工费'].toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">定额机械费</p>
+                                <p class="font-medium">¥${item['定额机械费'] ? item['定额机械费'].toLocaleString() : '0'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <h4 class="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">项目特征</h4>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        ${formattedFeatures}
+                    </div>
+                </div>
+                ${item['备注'] ? `
+                <div class="mt-6">
+                    <h4 class="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">备注</h4>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        ${item['备注']}
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            
+            detailModal.classList.remove('hidden');
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            // 总记录数
+            totalRecords.textContent = currentData.length;
+            
+            // 分项工程数量
+            const groups = new Set(currentData.map(item => item['分项工程']));
+            groupCount.textContent = groups.size;
+            
+            // 单项工程数量
+            const projects = new Set(currentData.map(item => item['单项工程']));
+            projectCount.textContent = projects.size;
+        }
+
+        // 显示加载指示器
+        function showLoading(text) {
+            loadingText.textContent = text || '处理中，请稍候...';
+            loadingIndicator.classList.remove('hidden');
+        }
+
+        // 隐藏加载指示器
+        function hideLoading() {
+            loadingIndicator.classList.add('hidden');
+        }
+
+        // 显示提示消息
+        function showToast(message, type = 'info') {
+            toastMessage.textContent = message;
+            
+            // 设置图标
+            if (type === 'success') {
+                toastIcon.className = 'fas fa-check-circle mr-2';
+                toast.classList.add('bg-green-600');
+                toast.classList.remove('bg-red-600', 'bg-yellow-600', 'bg-gray-800');
+            } else if (type === 'error') {
+                toastIcon.className = 'fas fa-exclamation-circle mr-2';
+                toast.classList.add('bg-red-600');
+                toast.classList.remove('bg-green-600', 'bg-yellow-600', 'bg-gray-800');
+            } else if (type === 'warning') {
+                toastIcon.className = 'fas fa-exclamation-triangle mr-2';
+                toast.classList.add('bg-yellow-600');
+                toast.classList.remove('bg-green-600', 'bg-red-600', 'bg-gray-800');
+            } else {
+                toastIcon.className = 'fas fa-info-circle mr-2';
+                toast.classList.add('bg-gray-800');
+                toast.classList.remove('bg-green-600', 'bg-red-600', 'bg-yellow-600');
+            }
+            
+            // 显示提示
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            // 3秒后隐藏
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+
+
+    </body></html>
+    
